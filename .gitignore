@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Environment
+.env
+
+# Node
+node_modules/
+
+# Vite
+dist/
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+
+# Uploads
+backend/uploads/
+
+# Python cache
+.pytest_cache/
+
+# Docker
+*.pid
