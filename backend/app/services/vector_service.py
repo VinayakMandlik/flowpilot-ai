@@ -17,20 +17,21 @@ class VectorService:
         )
 
     def create_collection(self, vector_size):
-        collections = self.client.get_collections().collections
 
+        collections = self.client.get_collections().collections
         names = [c.name for c in collections]
 
         if self.COLLECTION not in names:
+
             self.client.create_collection(
-                    collection_name=self.COLLECTION,
-                    vectors_config=VectorParams(
-                        size=vector_size,
-                        distance=Distance.COSINE,
-                    ),
+                collection_name=self.COLLECTION,
+                vectors_config=VectorParams(
+                    size=vector_size,
+                    distance=Distance.COSINE,
+                ),
             )
 
-    def store_chunk(self, vector, text):
+    def store_chunk(self, vector, text, filename, chunk_number):
 
         self.client.upsert(
             collection_name=self.COLLECTION,
@@ -39,8 +40,20 @@ class VectorService:
                     id=str(uuid4()),
                     vector=vector,
                     payload={
-                        "text": text
-                    }
+                        "text": text,
+                        "filename": filename,
+                        "chunk_number": chunk_number,
+                    },
                 )
-            ]
+            ],
         )
+
+    def search(self, vector, limit=8):
+
+        results = self.client.query_points(
+            collection_name=self.COLLECTION,
+            query=vector,
+            limit=limit,
+        )
+
+        return results.points

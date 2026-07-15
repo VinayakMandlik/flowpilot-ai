@@ -1,8 +1,8 @@
 from fastapi import APIRouter, UploadFile, File
 import os
+
 from app.services.embedding_service import EmbeddingService
 from app.services.vector_service import VectorService
-
 from app.services.pdf_service import PDFService
 from app.services.chunk_service import ChunkService
 
@@ -29,12 +29,28 @@ async def upload_pdf(file: UploadFile = File(...)):
     first_vector = EmbeddingService.get_embedding(chunks[0])
     vector_service.create_collection(len(first_vector))
 
-    for chunk in chunks[:2]:
-        vector = EmbeddingService.get_embedding(chunk)
-        vector_service.store_chunk(vector, chunk)
+    stored_count = 0
+
+    for index, chunk in enumerate(chunks):
+
+        try:
+            vector = EmbeddingService.get_embedding(chunk)
+
+            vector_service.store_chunk(
+                vector=vector,
+                text=chunk,
+                filename=file.filename,
+                chunk_number=index,
+            )
+
+            stored_count += 1
+            print(f"Stored {stored_count}/{len(chunks)}")
+
+        except Exception as e:
+            print(f"Failed chunk {index + 1}: {e}")
 
     return {
         "filename": file.filename,
-        "chunks": len(chunks),
-        "message": "Stored successfully in Qdrant"
+        "total_chunks": len(chunks),
+        "stored_chunks": stored_count,
     }
