@@ -5,6 +5,7 @@ from app.services.embedding_service import EmbeddingService
 from app.services.vector_service import VectorService
 from app.services.pdf_service import PDFService
 from app.services.chunk_service import ChunkService
+from app.services.document_service import DocumentService
 
 router = APIRouter(prefix="/api/v1", tags=["Upload"])
 
@@ -24,6 +25,12 @@ async def upload_pdf(file: UploadFile = File(...)):
 
     chunks = ChunkService.chunk_text(text)
 
+    # Create document record in Supabase
+    document = DocumentService.create_document(
+        filename=file.filename,
+        total_chunks=len(chunks)
+    )
+
     vector_service = VectorService()
 
     first_vector = EmbeddingService.get_embedding(chunks[0])
@@ -34,6 +41,7 @@ async def upload_pdf(file: UploadFile = File(...)):
     for index, chunk in enumerate(chunks):
 
         try:
+
             vector = EmbeddingService.get_embedding(chunk)
 
             vector_service.store_chunk(
@@ -41,6 +49,7 @@ async def upload_pdf(file: UploadFile = File(...)):
                 text=chunk,
                 filename=file.filename,
                 chunk_number=index,
+                document_id=document["id"],
             )
 
             stored_count += 1
@@ -50,6 +59,7 @@ async def upload_pdf(file: UploadFile = File(...)):
             print(f"Failed chunk {index + 1}: {e}")
 
     return {
+        "document_id": document["id"],
         "filename": file.filename,
         "total_chunks": len(chunks),
         "stored_chunks": stored_count,
