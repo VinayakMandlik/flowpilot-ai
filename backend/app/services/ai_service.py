@@ -9,16 +9,15 @@ class AIService:
 
     @staticmethod
     def ask(prompt: str):
-
         response = client.models.generate_content(
             model="gemini-2.5-flash",
-            contents=prompt
+            contents=prompt,
         )
 
         return response.text
 
     @staticmethod
-    def generate_answer(context: str, question: str):
+    def stream_answer(context: str, question: str):
 
         prompt = f"""
 You are FlowPilot AI, an enterprise document assistant.
@@ -46,9 +45,11 @@ Instructions:
 ======================== ANSWER ==========================
 """
 
-        response = client.models.generate_content(
+        response = client.models.generate_content_stream(
             model="gemini-2.5-flash",
-            contents=prompt
+            contents=prompt,
         )
 
-        return response.text
+        for chunk in response:
+            if chunk.text:
+                yield chunk.text
