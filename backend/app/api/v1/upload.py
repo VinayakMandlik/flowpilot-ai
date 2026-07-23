@@ -1,5 +1,5 @@
 from fastapi import APIRouter, UploadFile, File
-import os
+from app.core.supabase import supabase
 
 from app.services.embedding_service import EmbeddingService
 from app.services.vector_service import VectorService
@@ -9,31 +9,51 @@ from app.services.document_service import DocumentService
 
 router = APIRouter(prefix="/api/v1", tags=["Upload"])
 
-UPLOAD_DIR = "uploads"
-os.makedirs(UPLOAD_DIR, exist_ok=True)
-
 
 @router.post("/upload")
 async def upload_pdf(file: UploadFile = File(...)):
 
-    file_path = os.path.join(UPLOAD_DIR, file.filename)
+    file_bytes = await file.read()
 
-    with open(file_path, "wb") as buffer:
-        buffer.write(await file.read())
+    # Upload PDF to Supabase Storage
+    supabase.storage.from_("documents").upload(
+        path=file.filename,
+        file=file_bytes,
+        file_options={
+            "content-type": "application/pdf",
+            "upsert": "true",
+        },
+    )
 
-    text = PDFService.extract_text(file_path)
+    # Extract pages
+    pages = PDFService.extract_pages(file_bytes)
 
-    chunks = ChunkService.chunk_text(text)
+    chunks = []
 
-    # Create document record in Supabase
+    for page in pages:
+
+        page_chunks = ChunkService.chunk_text(page["text"])
+
+        for chunk in page_chunks:
+
+            chunks.append(
+                {
+                    "text": chunk,
+                    "page": page["page"],
+                }
+            )
+
     document = DocumentService.create_document(
         filename=file.filename,
-        total_chunks=len(chunks)
+        total_chunks=len(chunks),
     )
 
     vector_service = VectorService()
 
-    first_vector = EmbeddingService.get_embedding(chunks[0])
+    first_vector = EmbeddingService.get_embedding(
+        chunks[0]["text"]
+    )
+
     vector_service.create_collection(len(first_vector))
 
     stored_count = 0
@@ -42,21 +62,23 @@ async def upload_pdf(file: UploadFile = File(...)):
 
         try:
 
-            vector = EmbeddingService.get_embedding(chunk)
+            vector = EmbeddingService.get_embedding(
+                chunk["text"]
+            )
 
             vector_service.store_chunk(
                 vector=vector,
-                text=chunk,
+                text=chunk["text"],
                 filename=file.filename,
                 chunk_number=index,
+                page=chunk["page"],
                 document_id=document["id"],
             )
 
             stored_count += 1
-            print(f"Stored {stored_count}/{len(chunks)}")
 
         except Exception as e:
-            print(f"Failed chunk {index + 1}: {e}")
+            print(e)
 
     return {
         "document_id": document["id"],

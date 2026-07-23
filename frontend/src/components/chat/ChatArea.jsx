@@ -117,12 +117,16 @@ export default function ChatArea({
                           </p>
 
                           <p className="mt-1 text-sm text-zinc-400">
-                            Chunk #{source.chunk_number}
-                          </p>
+  📄 Page {source.page}
+</p>
 
-                          <p className="mt-1 text-sm text-green-400">
-                            {(source.score * 100).toFixed(1)}% Similarity
-                          </p>
+                        <p className="mt-1 text-sm text-zinc-400">
+                          Chunk #{source.chunk_number}
+                        </p>
+
+                        <p className="mt-1 text-sm text-green-400">
+                          {(source.score * 100).toFixed(1)}% Similarity
+                        </p>
                         </div>
                       ))}
                     </div>

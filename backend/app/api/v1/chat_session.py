@@ -14,6 +14,10 @@ class CreateSessionRequest(BaseModel):
     document_id: str
 
 
+class RenameSessionRequest(BaseModel):
+    title: str
+
+
 @router.post("/chat/session")
 async def create_session(request: CreateSessionRequest):
 
@@ -35,6 +39,18 @@ async def get_sessions():
 async def get_session_messages(session_id: str):
 
     return ChatSessionService.get_messages(session_id)
+
+
+@router.patch("/chat/session/{session_id}")
+async def rename_session(
+    session_id: str,
+    request: RenameSessionRequest,
+):
+
+    return ChatSessionService.rename_session(
+        session_id=session_id,
+        title=request.title,
+    )
 
 
 @router.delete("/chat/session/{session_id}")

@@ -29,11 +29,12 @@ async def chat(request: ChatRequest):
     for point in results:
 
         payload = point.payload
-
+        print(payload)
         context_parts.append(
             f"""
 ========================
 Document : {payload['filename']}
+Page : {payload.get('page')}
 Chunk : {payload['chunk_number']}
 ========================
 
@@ -43,6 +44,7 @@ Chunk : {payload['chunk_number']}
 
         sources.append({
             "filename": payload["filename"],
+            "page": payload.get("page"),
             "chunk_number": payload["chunk_number"],
             "score": round(point.score, 4)
         })

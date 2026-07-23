@@ -23,12 +23,14 @@ class ChatDocumentRequest(BaseModel):
 @router.post("/chat/document")
 async def chat_document(request: ChatDocumentRequest):
 
+    # Generate embedding for user's question
     question_vector = EmbeddingService.get_embedding(
         request.question
     )
 
     vector_service = VectorService()
 
+    # Search only inside the selected document
     results = vector_service.search_document(
         vector=question_vector,
         document_id=request.document_id,
@@ -40,11 +42,22 @@ async def chat_document(request: ChatDocumentRequest):
     for point in results:
         payload = point.payload
 
-        context_parts.append(payload["text"])
+        context_parts.append(
+            f"""
+========================
+Document : {payload["filename"]}
+Page : {payload["page"]}
+Chunk : {payload["chunk_number"]}
+========================
+
+{payload["text"]}
+"""
+        )
 
         sources.append(
             {
                 "filename": payload["filename"],
+                "page": payload["page"],
                 "chunk_number": payload["chunk_number"],
                 "score": round(point.score, 4),
             }
@@ -70,7 +83,7 @@ async def chat_document(request: ChatDocumentRequest):
         ):
             full_answer += chunk
 
-            yield f"data: {json.dumps({'type':'token','content':chunk})}\n\n"
+            yield f"data: {json.dumps({'type': 'token', 'content': chunk})}\n\n"
 
         # Save AI response
         ChatSessionService.save_message(
@@ -80,10 +93,10 @@ async def chat_document(request: ChatDocumentRequest):
             sources=sources,
         )
 
-        # Send sources
-        yield f"data: {json.dumps({'type':'sources','content':sources})}\n\n"
+        # Send sources to frontend
+        yield f"data: {json.dumps({'type': 'sources', 'content': sources})}\n\n"
 
-        # Tell frontend we're finished
+        # Notify frontend that streaming is complete
         yield "data: {\"type\":\"done\"}\n\n"
 
     return StreamingResponse(

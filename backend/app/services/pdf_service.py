@@ -1,17 +1,24 @@
 import fitz
 
+
 class PDFService:
 
     @staticmethod
-    def extract_text(file_path: str):
+    def extract_pages(file_bytes: bytes):
 
-        pdf = fitz.open(file_path)
+        pdf = fitz.open(stream=file_bytes, filetype="pdf")
 
-        text = ""
+        pages = []
 
-        for page in pdf:
-            text += page.get_text()
+        for page_number, page in enumerate(pdf, start=1):
+
+            pages.append(
+                {
+                    "page": page_number,
+                    "text": page.get_text()
+                }
+            )
 
         pdf.close()
 
-        return text
+        return pages

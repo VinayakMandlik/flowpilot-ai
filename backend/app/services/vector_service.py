@@ -40,7 +40,6 @@ class VectorService:
                 ),
             )
 
-        # Ensure payload index always exists
         try:
             self.client.create_payload_index(
                 collection_name=self.COLLECTION,
@@ -56,6 +55,7 @@ class VectorService:
         text,
         filename,
         chunk_number,
+        page,
         document_id,
     ):
 
@@ -70,6 +70,7 @@ class VectorService:
                         "text": text,
                         "filename": filename,
                         "chunk_number": chunk_number,
+                        "page": page,
                     },
                 )
             ],
@@ -80,6 +81,29 @@ class VectorService:
         results = self.client.query_points(
             collection_name=self.COLLECTION,
             query=vector,
+            limit=limit,
+        )
+
+        return results.points
+
+    def search_document(
+        self,
+        vector,
+        document_id,
+        limit=8,
+    ):
+
+        results = self.client.query_points(
+            collection_name=self.COLLECTION,
+            query=vector,
+            query_filter=Filter(
+                must=[
+                    FieldCondition(
+                        key="document_id",
+                        match=MatchValue(value=document_id),
+                    )
+                ]
+            ),
             limit=limit,
         )
 
@@ -98,25 +122,3 @@ class VectorService:
                 ]
             ),
         )
-    def search_document(
-    self,
-    vector,
-    document_id,
-    limit=8,
-):
-
-        results = self.client.query_points(
-            collection_name=self.COLLECTION,
-            query=vector,
-            query_filter=Filter(
-                must=[
-                    FieldCondition(
-                        key="document_id",
-                        match=MatchValue(value=document_id),
-                    )
-                ]
-            ),
-            limit=limit,
-        )
-
-        return results.points

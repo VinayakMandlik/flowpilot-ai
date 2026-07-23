@@ -14,6 +14,14 @@ export const getMessages = async (sessionId) => {
   return data;
 };
 
+export const renameSession = async (sessionId, title) => {
+  const { data } = await api.patch(`/chat/session/${sessionId}`, {
+    title,
+  });
+
+  return data;
+};
+
 export const deleteSession = async (sessionId) => {
   await api.delete(`/chat/session/${sessionId}`);
 };

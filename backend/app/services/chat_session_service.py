@@ -46,17 +46,20 @@ class ChatSessionService:
         return response.data
 
     @staticmethod
-    def delete_session(session_id: str):
+    def rename_session(session_id: str, title: str):
 
-        supabase \
-            .table("chat_sessions") \
-            .delete() \
-            .eq("id", session_id) \
+        response = (
+            supabase
+            .table("chat_sessions")
+            .update({
+                "title": title
+            })
+            .eq("id", session_id)
             .execute()
+        )
 
-        return {
-            "message": "Session deleted successfully"
-        }
+        return response.data[0]
+
 
     @staticmethod
     def save_message(
@@ -89,3 +92,17 @@ class ChatSessionService:
         )
 
         return response.data
+    @staticmethod
+    def delete_session(session_id: str):
+
+        supabase.table("chat_messages") \
+            .delete() \
+            .eq("session_id", session_id) \
+            .execute()
+
+        supabase.table("chat_sessions") \
+            .delete() \
+            .eq("id", session_id) \
+            .execute()
+
+        return {"message": "Session deleted successfully"}
