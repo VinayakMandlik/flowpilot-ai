@@ -1,12 +1,13 @@
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-import json
+import logging
 
-from app.services.embedding_service import EmbeddingService
-from app.services.vector_service import VectorService
-from app.services.ai_service import AIService
+from app.services.intent_router import IntentRouter
 from app.services.chat_session_service import ChatSessionService
+from app.pipelines.pipeline_factory import PipelineFactory
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(
     prefix="/api/v1",
@@ -23,84 +24,39 @@ class ChatDocumentRequest(BaseModel):
 @router.post("/chat/document")
 async def chat_document(request: ChatDocumentRequest):
 
-    # Generate embedding for user's question
-    question_vector = EmbeddingService.get_embedding(
-        request.question
+    # ------------------------------------------------------------------
+    # Load recent conversation history
+    # ------------------------------------------------------------------
+    history = ChatSessionService.get_recent_history(
+        request.session_id,
+        limit=6,
     )
 
-    vector_service = VectorService()
-
-    # Search only inside the selected document
-    results = vector_service.search_document(
-        vector=question_vector,
-        document_id=request.document_id,
+    # ------------------------------------------------------------------
+    # Detect intent
+    # ------------------------------------------------------------------
+    intent = IntentRouter.detect(
+        question=request.question,
+        has_document=True,
     )
 
-    context_parts = []
-    sources = []
+    logger.info("=" * 80)
+    logger.info("Question: %s", request.question)
+    logger.info("Intent: %s", intent.value)
+    logger.info("=" * 80)
 
-    for point in results:
-        payload = point.payload
+    # ------------------------------------------------------------------
+    # Route request
+    # ------------------------------------------------------------------
+    pipeline = PipelineFactory.get(intent)
 
-        context_parts.append(
-            f"""
-========================
-Document : {payload["filename"]}
-Page : {payload["page"]}
-Chunk : {payload["chunk_number"]}
-========================
-
-{payload["text"]}
-"""
-        )
-
-        sources.append(
-            {
-                "filename": payload["filename"],
-                "page": payload["page"],
-                "chunk_number": payload["chunk_number"],
-                "score": round(point.score, 4),
-            }
-        )
-
-    context = "\n\n".join(context_parts)
-
-    async def generate():
-
-        # Save user's message
-        ChatSessionService.save_message(
-            session_id=request.session_id,
-            role="user",
-            content=request.question,
-        )
-
-        full_answer = ""
-
-        # Stream Gemini response
-        for chunk in AIService.stream_answer(
-            context=context,
-            question=request.question,
-        ):
-            full_answer += chunk
-
-            yield f"data: {json.dumps({'type': 'token', 'content': chunk})}\n\n"
-
-        # Save AI response
-        ChatSessionService.save_message(
-            session_id=request.session_id,
-            role="assistant",
-            content=full_answer,
-            sources=sources,
-        )
-
-        # Send sources to frontend
-        yield f"data: {json.dumps({'type': 'sources', 'content': sources})}\n\n"
-
-        # Notify frontend that streaming is complete
-        yield "data: {\"type\":\"done\"}\n\n"
+    generator = await pipeline.execute(
+        request=request,
+        history=history,
+    )
 
     return StreamingResponse(
-        generate(),
+        generator,
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",

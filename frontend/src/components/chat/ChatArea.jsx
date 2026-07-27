@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
@@ -13,11 +13,14 @@ export default function ChatArea({
 }) {
   const bottomRef = useRef(null);
 
+  const [selectedSource, setSelectedSource] = useState(null);
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({
       behavior: "smooth",
     });
   }, [messages, loading]);
+  console.log("ChatArea rendered");
 
   if (!selectedDocument) {
     return (
@@ -89,14 +92,16 @@ export default function ChatArea({
             {/* AI */}
 
             <div className="flex justify-start">
-              <div className="prose prose-invert max-w-4xl rounded-2xl border border-zinc-800 bg-zinc-900 px-6 py-5 shadow">
+              <div className="max-w-4xl rounded-2xl border border-zinc-800 bg-zinc-900 px-6 py-5 shadow">
 
+              <div className="prose prose-invert max-w-none">
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm]}
                   rehypePlugins={[rehypeHighlight]}
                 >
                   {msg.answer}
                 </ReactMarkdown>
+              </div>
 
                 {msg.sources?.length > 0 && (
                   <>
@@ -110,23 +115,24 @@ export default function ChatArea({
                       {msg.sources.map((source, idx) => (
                         <div
                           key={idx}
-                          className="rounded-xl border border-zinc-700 bg-zinc-950 p-4"
+                          onClick={() => setSelectedSource(source)}
+                          className="cursor-pointer rounded-xl border border-zinc-700 bg-zinc-950 p-4 transition hover:border-blue-500 hover:bg-zinc-900"
                         >
                           <p className="font-medium">
                             📄 {source.filename}
                           </p>
 
                           <p className="mt-1 text-sm text-zinc-400">
-  📄 Page {source.page}
-</p>
+                            📄 Page {source.page}
+                          </p>
 
-                        <p className="mt-1 text-sm text-zinc-400">
-                          Chunk #{source.chunk_number}
-                        </p>
+                          <p className="mt-1 text-sm text-zinc-400">
+                            Chunk #{source.chunk_number}
+                          </p>
 
-                        <p className="mt-1 text-sm text-green-400">
-                          {(source.score * 100).toFixed(1)}% Similarity
-                        </p>
+                          <p className="mt-1 text-sm text-green-400">
+                            {(source.score * 100).toFixed(1)}% Similarity
+                          </p>
                         </div>
                       ))}
                     </div>
@@ -152,6 +158,42 @@ export default function ChatArea({
         <div ref={bottomRef} />
 
       </div>
+
+      {selectedSource && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70"
+          onClick={() => setSelectedSource(null)}
+        >
+          <div
+            className="max-h-[80vh] w-[700px] overflow-y-auto rounded-xl border border-zinc-700 bg-zinc-900 p-6 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-5 flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-bold text-white">
+                  {selectedSource.filename}
+                </h2>
+
+                <p className="text-sm text-zinc-400">
+                  Page {selectedSource.page}
+                </p>
+              </div>
+
+              <button
+                onClick={() => setSelectedSource(null)}
+                className="rounded-lg px-3 py-1 text-zinc-400 hover:bg-zinc-800 hover:text-white"
+              >
+                ✕
+              </button>
+            </div>
+
+            <pre className="whitespace-pre-wrap rounded-lg border border-zinc-800 bg-zinc-950 p-4 text-sm leading-7 text-zinc-200">
+              {selectedSource.text}
+            </pre>
+          </div>
+        </div>
+      )}
+
     </main>
   );
 }

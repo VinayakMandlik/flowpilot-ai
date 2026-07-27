@@ -60,7 +60,6 @@ class ChatSessionService:
 
         return response.data[0]
 
-
     @staticmethod
     def save_message(
         session_id: str,
@@ -92,6 +91,43 @@ class ChatSessionService:
         )
 
         return response.data
+
+    @staticmethod
+    def get_conversation_history(session_id: str):
+
+        response = (
+            supabase
+            .table("chat_messages")
+            .select("role, content")
+            .eq("session_id", session_id)
+            .order("created_at")
+            .execute()
+        )
+
+        history = []
+
+        for message in response.data:
+            history.append(
+                {
+                    "role": message["role"],
+                    "content": message["content"],
+                }
+            )
+
+        return history
+
+    @staticmethod
+    def get_recent_history(
+        session_id: str,
+        limit: int = 6,
+    ):
+
+        history = ChatSessionService.get_conversation_history(
+            session_id
+        )
+
+        return history[-limit:]
+
     @staticmethod
     def delete_session(session_id: str):
 

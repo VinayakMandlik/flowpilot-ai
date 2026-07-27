@@ -57,3 +57,6 @@ async def rename_session(
 async def delete_session(session_id: str):
 
     return ChatSessionService.delete_session(session_id)
+@router.delete("/chat/session/{session_id}")
+async def delete_session(session_id: str):
+    return ChatSessionService.delete_session(session_id)

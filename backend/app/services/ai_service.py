@@ -1,82 +1,66 @@
-from google import genai
-
-from app.core.config import settings
-
-client = genai.Client(api_key=settings.GEMINI_API_KEY)
+from app.providers.provider_factory import ProviderFactory
+from app.services.prompt_builder import PromptBuilder
 
 
 class AIService:
 
     @staticmethod
-    def generate_answer(context: str, question: str):
+    def _build_history(history):
 
-        prompt = f"""
-You are FlowPilot AI, an enterprise document assistant.
+        if not history:
+            return "No previous conversation."
 
-Your task is to answer the user's question using ONLY the information provided in the context.
+        formatted = []
 
-Instructions:
+        for message in history:
 
-- Read every retrieved document carefully.
-- If the answer exists, explain it clearly.
-- You may infer explanations from SQL code examples.
-- Never make up facts.
-- If the answer is not present anywhere in the context, reply exactly:
+            role = (
+                "User"
+                if message["role"] == "user"
+                else "Assistant"
+            )
 
-"I couldn't find this information in the uploaded documents."
+            formatted.append(
+                f"{role}: {message['content']}"
+            )
 
-======================== CONTEXT ========================
-
-{context}
-
-======================== QUESTION ========================
-
-{question}
-
-======================== ANSWER ==========================
-"""
-
-        response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=prompt,
-        )
-
-        return response.text
+        return "\n\n".join(formatted)
 
     @staticmethod
-    def stream_answer(context: str, question: str):
+    def _stream(prompt: str):
 
-        prompt = f"""
-You are FlowPilot AI, an enterprise document assistant.
+        provider = ProviderFactory.get_provider()
 
-Your task is to answer the user's question using ONLY the information provided in the context.
+        yield from provider.stream(prompt)
 
-Instructions:
+    @staticmethod
+    def stream_rag_answer(
+        context: str,
+        question: str,
+        history=None,
+    ):
 
-- Read every retrieved document carefully.
-- If the answer exists, explain it clearly.
-- You may infer explanations from SQL code examples.
-- Never make up facts.
-- If the answer is not present anywhere in the context, reply exactly:
+        history_text = AIService._build_history(history)
 
-"I couldn't find this information in the uploaded documents."
-
-======================== CONTEXT ========================
-
-{context}
-
-======================== QUESTION ========================
-
-{question}
-
-======================== ANSWER ==========================
-"""
-
-        response = client.models.generate_content_stream(
-            model="gemini-2.5-flash",
-            contents=prompt,
+        prompt = PromptBuilder.build_rag_prompt(
+            context=context,
+            question=question,
+            history_text=history_text,
         )
 
-        for chunk in response:
-            if chunk.text:
-                yield chunk.text
+        yield from AIService._stream(prompt)
+
+    @staticmethod
+    def stream_general_answer(
+        question: str,
+        history=None,
+    ):
+
+        history_text = AIService._build_history(history)
+
+        prompt = PromptBuilder.build_general_prompt(
+            question=question,
+            history_text=history_text,
+        )
+
+        yield from AIService._stream(prompt)
