@@ -1,63 +1,26 @@
 import json
 
-from app.services.embedding_service import EmbeddingService
-from app.services.vector_service import VectorService
 from app.services.ai_service import AIService
 from app.services.chat_session_service import ChatSessionService
-from app.services.query_processor import QueryProcessor
+from app.services.retrieval_service import RetrievalService
 
 
 class RagPipeline:
 
+    MIN_CONFIDENCE = 0.45
+
     @staticmethod
     async def execute(request, history):
 
-        retrieval_query = QueryProcessor.build_search_query(
-            request.question,
-            history,
-        )
-
-        question_vector = EmbeddingService.get_embedding(
-            retrieval_query
-        )
-
-        vector_service = VectorService()
-
-        results = vector_service.search_document(
-            vector=question_vector,
+        retrieval = RetrievalService.retrieve(
+            question=request.question,
+            history=history,
             document_id=request.document_id,
         )
 
-        context_parts = []
-        sources = []
-
-        for point in results:
-
-            payload = point.payload
-
-            context_parts.append(
-                f"""
-========================
-Document : {payload["filename"]}
-Page : {payload["page"]}
-Chunk : {payload["chunk_number"]}
-========================
-
-{payload["text"]}
-"""
-            )
-
-            sources.append(
-                {
-                    "filename": payload["filename"],
-                    "page": payload["page"],
-                    "chunk_number": payload["chunk_number"],
-                    "score": round(point.score, 4),
-                    "text": payload["text"],
-                }
-            )
-
-        context = "\n\n".join(context_parts)
+        context = retrieval["context"]
+        sources = retrieval["sources"]
+        confidence = retrieval["confidence"]
 
         async def generate():
 
@@ -66,6 +29,38 @@ Chunk : {payload["chunk_number"]}
                 role="user",
                 content=request.question,
             )
+
+            if (
+                not context.strip()
+                or confidence < RagPipeline.MIN_CONFIDENCE
+            ):
+
+                answer = (
+                    "The uploaded document does not contain enough "
+                    "relevant information to answer this question."
+                )
+
+                ChatSessionService.save_message(
+                    session_id=request.session_id,
+                    role="assistant",
+                    content=answer,
+                    sources=[],
+                )
+
+                yield (
+                    f"data: {json.dumps({'type':'token','content':answer})}\n\n"
+                )
+
+                yield (
+                    f"data: {json.dumps({'type':'confidence','content':confidence})}\n\n"
+                )
+
+                yield (
+                    f"data: {json.dumps({'type':'sources','content':[]})}\n\n"
+                )
+
+                yield 'data: {"type":"done"}\n\n'
+                return
 
             full_answer = ""
 
@@ -77,7 +72,9 @@ Chunk : {payload["chunk_number"]}
 
                 full_answer += chunk
 
-                yield f"data: {json.dumps({'type':'token','content':chunk})}\n\n"
+                yield (
+                    f"data: {json.dumps({'type':'token','content':chunk})}\n\n"
+                )
 
             ChatSessionService.save_message(
                 session_id=request.session_id,
@@ -86,8 +83,14 @@ Chunk : {payload["chunk_number"]}
                 sources=sources,
             )
 
-            yield f"data: {json.dumps({'type':'sources','content':sources})}\n\n"
+            yield (
+                f"data: {json.dumps({'type':'confidence','content':confidence})}\n\n"
+            )
 
-            yield "data: {\"type\":\"done\"}\n\n"
+            yield (
+                f"data: {json.dumps({'type':'sources','content':sources})}\n\n"
+            )
+
+            yield 'data: {"type":"done"}\n\n'
 
         return generate()

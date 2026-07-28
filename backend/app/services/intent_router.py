@@ -13,34 +13,38 @@ class IntentRouter:
         "document",
         "pdf",
         "page",
+        "pages",
         "section",
         "chapter",
         "uploaded",
-        "question",
+        "upload",
+        "file",
         "table",
         "figure",
         "paragraph",
         "line",
+        "context",
+        "chunk",
+        "according",
+        "mentioned",
         "this",
         "that",
+        "these",
+        "those",
         "it",
+        "its",
         "above",
         "below",
         "previous",
+        "same",
+        "again",
     }
 
     GENERAL_PATTERNS = (
-        "what is",
         "who is",
         "when did",
         "where is",
-        "why is",
-        "how does",
-        "define",
-        "explain",
-        "difference between",
-        "advantages of",
-        "disadvantages of",
+        "tell me about",
     )
 
     @staticmethod
@@ -49,23 +53,24 @@ class IntentRouter:
         has_document: bool,
     ) -> Intent:
 
+        question = question.strip()
         question_lower = question.lower()
 
         if not has_document:
             return Intent.GENERAL
 
-        words = set(question_lower.split())
+        words = set(question_lower.replace("?", "").split())
 
-        # Explicit document reference
         if words & IntentRouter.DOCUMENT_KEYWORDS:
             return Intent.RAG
 
-        # Pure general knowledge question
-        if any(
-            question_lower.startswith(pattern)
-            for pattern in IntentRouter.GENERAL_PATTERNS
-        ):
+        if len(words) <= 5:
+            return Intent.RAG
+
+        if any(question_lower.startswith(pattern) for pattern in IntentRouter.GENERAL_PATTERNS):
             return Intent.GENERAL
 
-        # Default to RAG when a document is selected
-        return Intent.RAG
+        # If a document is open and the question does not explicitly
+        # target the document or general knowledge, let the Hybrid
+        # pipeline decide.
+        return Intent.HYBRID

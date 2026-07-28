@@ -29,13 +29,13 @@ export default function ChatInput({
     setQuestion("");
     setLoading(true);
 
-    // Add user's question with an empty AI response
     setMessages((prev) => [
       ...prev,
       {
         question: userQuestion,
         answer: "",
         sources: [],
+        confidence: null,
       },
     ]);
 
@@ -86,7 +86,21 @@ export default function ChatInput({
               updated[updated.length - 1] = {
                 ...updated[updated.length - 1],
                 answer:
-                  updated[updated.length - 1].answer + json.content,
+                  updated[updated.length - 1].answer +
+                  json.content,
+              };
+
+              return updated;
+            });
+          }
+
+          if (json.type === "confidence") {
+            setMessages((prev) => {
+              const updated = [...prev];
+
+              updated[updated.length - 1] = {
+                ...updated[updated.length - 1],
+                confidence: json.content,
               };
 
               return updated;

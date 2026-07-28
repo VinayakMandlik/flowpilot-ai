@@ -18,6 +18,8 @@ class VectorService:
 
     COLLECTION = "flowpilot"
 
+    DEFAULT_LIMIT = 12
+
     def __init__(self):
 
         self.client = QdrantClient(
@@ -76,22 +78,39 @@ class VectorService:
             ],
         )
 
-    def search(self, vector, limit=8):
+    def search(
+        self,
+        vector,
+        limit=None,
+        score_threshold=0.35,
+    ):
+
+        if limit is None:
+            limit = self.DEFAULT_LIMIT
 
         results = self.client.query_points(
             collection_name=self.COLLECTION,
             query=vector,
             limit=limit,
+            score_threshold=score_threshold,
         )
 
-        return results.points
+        return sorted(
+            results.points,
+            key=lambda x: x.score,
+            reverse=True,
+        )
 
     def search_document(
         self,
         vector,
         document_id,
-        limit=8,
+        limit=None,
+        score_threshold=0.35,
     ):
+
+        if limit is None:
+            limit = self.DEFAULT_LIMIT
 
         results = self.client.query_points(
             collection_name=self.COLLECTION,
@@ -105,9 +124,34 @@ class VectorService:
                 ]
             ),
             limit=limit,
+            score_threshold=score_threshold,
         )
 
-        return results.points
+        ranked = sorted(
+            results.points,
+            key=lambda x: x.score,
+            reverse=True,
+        )
+
+        unique = []
+        seen = set()
+
+        for point in ranked:
+
+            payload = point.payload
+
+            key = (
+                payload["page"],
+                payload["chunk_number"],
+            )
+
+            if key in seen:
+                continue
+
+            seen.add(key)
+            unique.append(point)
+
+        return unique
 
     def delete_document_chunks(self, document_id):
 

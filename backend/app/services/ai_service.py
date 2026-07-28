@@ -41,12 +41,22 @@ class AIService:
     ):
 
         history_text = AIService._build_history(history)
+        # print("\n" + "=" * 100)
+        # print("CONTEXT LENGTH:", len(context))
+        # print("=" * 100)
+        # print(context[:3000])  # Print first 3000 characters
+        # print("=" * 100)
 
         prompt = PromptBuilder.build_rag_prompt(
             context=context,
             question=question,
             history_text=history_text,
         )
+        # print("\n" + "=" * 100)
+        # print("PROMPT SENT TO GEMINI")
+        # print("=" * 100)
+        # print(prompt)
+        # print("=" * 100)
 
         yield from AIService._stream(prompt)
 

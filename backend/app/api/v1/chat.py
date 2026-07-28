@@ -29,7 +29,7 @@ async def chat(request: ChatRequest):
     for point in results:
 
         payload = point.payload
-        print(payload)
+        # print(payload)
         context_parts.append(
             f"""
 ========================
